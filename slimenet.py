@@ -9,6 +9,10 @@ from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 import numpy as np
 import pylab as plt
+import os
+
+# Heighth and width of frames
+RES = 10
 
 # We create a layer which take as input movies of shape
 # (n_frames, width, height, channels) and returns a movie
@@ -16,7 +20,7 @@ import pylab as plt
 
 seq = Sequential()
 seq.add(ConvLSTM2D(filters=40, kernel_size=(3, 3),
-                   input_shape=(None, 40, 40, 1),
+                   input_shape=(None, RES, RES, 1),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
@@ -39,14 +43,6 @@ seq.add(Conv3D(filters=1, kernel_size=(3, 3, 3),
 #opt = tf.keras.optimizers.Adam(lr=1e-3, decay=1e-5)
 
 seq.compile(loss='binary_crossentropy', optimizer='adadelta')
-
-
-# Artificial data generation:
-# Generate movies with 3 to 7 moving squares inside.
-# The squares are of shape 1x1 or 2x2 pixels,
-# which move linearly over time.
-# For convenience we first create movies with bigger width and height (80x80)
-# and at the end we select a 40x40 window.
 
 def generate_movies(n_samples=1200, n_frames=15):
     row = 80
@@ -95,15 +91,22 @@ def generate_movies(n_samples=1200, n_frames=15):
                                y_shift - w: y_shift + w, 0] += 1
 
     # Cut to a 40x40 window
-    noisy_movies = noisy_movies[::, ::, 20:60, 20:60, ::]
-    shifted_movies = shifted_movies[::, ::, 20:60, 20:60, ::]
+    noisy_movies = noisy_movies[::, ::, 50:60, 50:60, ::]
+    shifted_movies = shifted_movies[::, ::, 50:60, 50:60, ::]
     noisy_movies[noisy_movies >= 1] = 1
     shifted_movies[shifted_movies >= 1] = 1
     return noisy_movies, shifted_movies
 
+def image_loader(batch_size):
+    frames = os.listdir('frames')[1:]
+
+    while True:
+        batch_start = 0
+        batch_end = batch_size
+
 # Train the network
 noisy_movies, shifted_movies = generate_movies(n_samples=1200)
-seq.fit(noisy_movies[:1000], shifted_movies[:1000], batch_size=10,
+seq.fit(noisy_movies[:1000], shifted_movies[:1000], batch_size=batch_size,
         epochs=1, validation_split=0.05)
 
 # Testing the network on one movie
