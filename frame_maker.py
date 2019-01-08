@@ -36,7 +36,7 @@ for vid in os.listdir('vids')[1:]:
         # shave off any extra pixel on either side from rounding errors
         image = image[0:RES, 0:RES]
         # write frame to jpg
-        cv2.imwrite("frames/%s_frame%d.jpg" % (vid, count), image)
+        cv2.imwrite("frames/vid_%s_frame%d.jpg" % (vid, count), image)
         # read next frame
         success, image = vidcap.read()
         count += 1
