@@ -15,20 +15,20 @@ RES = 10
 # of identical shape.
 
 seq = Sequential()
-seq.add(ConvLSTM2D(filters=40, kernel_size=(3, 3),
-                   input_shape=(RES, RES, 3),
+seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
+                   input_shape=(None, 10, 10, 1),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
-seq.add(ConvLSTM2D(filters=40, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
-seq.add(ConvLSTM2D(filters=40, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
-seq.add(ConvLSTM2D(filters=40, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
@@ -36,25 +36,43 @@ seq.add(Conv3D(filters=1, kernel_size=(3, 3, 3),
                activation='sigmoid',
                padding='same', data_format='channels_last'))
 
-#opt = tf.keras.optimizers.Adam(lr=1e-3, decay=1e-5)
-
 seq.compile(loss='binary_crossentropy', optimizer='adadelta')
 
-def frame_data_generator(batch_size):
-    frame_names = filter(lambda f: f[:3] == 'vid' and f[-4:] == '.jpg',
-                         os.listdir('frames'))
-
+def frame_data_generator(batch_size, sample_size):
+    # frame_names = filter(lambda f: f[:3] == 'vid' and f[-4:] == '.jpg',
+    #                      sorted(os.listdir('frames')))
+    frame_names = os.listdir('frames')
+    frame_names = [f for f in frame_names if f[:3] == 'vid']
+    buffer = sample_size + 1
     while True:
-        batch_start = 0
-        batch_end = batch_size
+        batch_start = buffer
+        batch_end = batch_size + buffer
         total_num_frames = len(frame_names)
-        while batch_start < total_num_frames - 1:
-            limit = min(batch_end, total_num_frames - 1)
-            relevant_frames = map(lambda f: cv2.imread('frames/' + f),
-                                  frame_names[batch_start:limit + 1])
 
-            x = np.stack(relevant_frames[:-1])
-            y = np.stack(relevant_frames[1:])
+        # each time through this loop a batch is yielded until end of data
+        while batch_start < total_num_frames:
+            limit = min(batch_end, total_num_frames)
+            relevant_frames = []
+            for frame in frame_names[batch_start - buffer:limit]:
+                relevant_frames.append(cv2.imread('frames/' + frame)[:, :, :1])
+            relevant_frames = [f for f in relevant_frames if f.shape == (RES, RES, 1)]
+            x = []
+            for i in range(batch_size):
+                x.append(np.stack(
+                    relevant_frames[i:i + sample_size]
+                ))
+            x = np.stack(x)
+            print(x.shape)
+
+            y = []
+            for i in range(1, batch_size + 1):
+                y.append(np.stack(
+                    relevant_frames[i:i + sample_size]
+                ))
+            y = np.stack(y)
+            print(y.shape)
+            # x = np.zeros((30,7,10,10,1))
+            #y = np.zeros((30,7,10,10,1))
 
             yield (x, y)
 
@@ -63,6 +81,6 @@ def frame_data_generator(batch_size):
 
 
 # Train the network
-seq.fit_generator(frame_data_generator(batch_size=30),
-                  steps_per_epoch=100,
+seq.fit_generator(frame_data_generator(batch_size=10, sample_size=7),
+                  steps_per_epoch=260,
                   epochs=1)
