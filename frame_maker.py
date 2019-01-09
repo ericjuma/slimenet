@@ -7,7 +7,7 @@ import os
 import cv2
 
 # resolution that will be the height and width of each frame
-RES = 10
+RES = 240
 
 # goes through each vid in vids
 for vid in os.listdir('vids')[1:]:
