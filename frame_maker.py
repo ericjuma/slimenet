@@ -5,9 +5,10 @@ saved as jpegs in the frames folder
 
 import os
 import cv2
+import sys
 
 # resolution that will be the height and width of each frame
-RES = 240
+RES = int(sys.argv[1])
 
 # goes through each vid in vids
 for vid in os.listdir('vids')[1:]:

@@ -6,29 +6,33 @@ import numpy as np
 import pylab as plt
 import os
 import cv2
+import datetime
+import sys
+import random
 
 # Heighth and width of frames
-RES = 240
+RES = int(sys.argv[1])
 frame_names = [f for f in os.listdir('frames') if f[:3] == 'vid']
 # We create a layer which take as input movies of shape
 # (n_frames, width, height, channels) and returns a movie
 # of identical shape.
+sample_size = int(sys.argv[3])
 
 seq = Sequential()
-seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
                    input_shape=(None, RES, RES, 1),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
-seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
-seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
-seq.add(ConvLSTM2D(filters=10, kernel_size=(3, 3),
+seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
                    padding='same', return_sequences=True))
 seq.add(BatchNormalization())
 
@@ -38,12 +42,15 @@ seq.add(Conv3D(filters=1, kernel_size=(3, 3, 3),
 
 seq.compile(loss='binary_crossentropy', optimizer='adadelta')
 
-def frame_data_generator(batch_size, sample_size):
+seed = None
+seed_num = random.randint(0, len(frame_names) - 10)
+
+def frame_data_generator(batch_size, sample_size, batch_start=0):
 
     buffer = sample_size + 1
     while True:
-        batch_start = buffer
-        batch_end = batch_size + buffer
+        batch_start = batch_start + buffer
+        batch_end = batch_size + batch_start
         total_num_frames = len(frame_names)
 
         # each time through this loop a batch is yielded until end of data
@@ -74,13 +81,18 @@ def frame_data_generator(batch_size, sample_size):
             batch_end += batch_size
 
 # Train the network
-seq.fit_generator(frame_data_generator(batch_size=100, sample_size=7),
-                  steps_per_epoch=20,
-                  epochs=1)
+seq.fit_generator(frame_data_generator(batch_size=5, sample_size=sample_size),
+                  steps_per_epoch=200,
+                  epochs=int(sys.argv[2]))
 
-_, seed = next(frame_data_generator(batch_size=10, sample_size=7))
+_, seed = next(frame_data_generator(batch_size=5,
+                                    sample_size=sample_size,
+                                    batch_start=random.randint(0,
+                                    len(frame_names) - 20)))
+# for _ in range(random.randint(0, len(frame_names) - 10)):
+#     _, seed = next(frame_data_generator(batch_size=10, sample_size=7))
 
 
-for f in range(100):
-    cv2.imwrite("generated/generated_frame%d.jpg" % (f), (seed[0, 0, :, :, :] * 255))
+for f in range(12):
+    cv2.imwrite("generated/gen_%s__%d___res_%s___epochs_%s___ss_%s.jpg" % (datetime.datetime.now(), f, sys.argv[1], sys.argv[2], sys.argv[3]), (seed[0, 0, :, :, :] * 255))
     seed = seq.predict(seed)
