@@ -1,12 +1,12 @@
 from keras.models import Sequential
-from keras.layers.convolutional import Conv3D
+from keras.layers import Conv2D
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 import numpy as np
 import pylab as plt
 import os
 import cv2
-import datetime
+from datetime import datetime
 import sys
 import random
 
@@ -33,10 +33,10 @@ seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
 seq.add(BatchNormalization())
 
 seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
-                   padding='same', return_sequences=True))
+                   padding='same', return_sequences=False))
 seq.add(BatchNormalization())
 
-seq.add(Conv3D(filters=1, kernel_size=(3, 3, 3),
+seq.add(Conv2D(filters=1, kernel_size=(3, 3),
                activation='sigmoid',
                padding='same', data_format='channels_last'))
 
@@ -68,12 +68,18 @@ def frame_data_generator(batch_size, sample_size, batch_start=0):
             x = np.stack(x)
 
             y = []
+            # for i in range(1, batch_size + 1):
+            #     y.append(np.stack(
+            #         relevant_frames[i:i + sample_size]
+            #     ))
+
             for i in range(1, batch_size + 1):
-                y.append(np.stack(
-                    relevant_frames[i:i + sample_size]
-                ))
+                y.append(
+                    relevant_frames[i + sample_size]
+                )
             y = np.stack(y)
-            assert(np.array_equal(x[1],y[0]))
+            #   print("y shape", y.shape)
+            #assert(np.array_equal(x[1],y[0]))
 
             yield (x, y)
 
@@ -85,14 +91,20 @@ seq.fit_generator(frame_data_generator(batch_size=5, sample_size=sample_size),
                   steps_per_epoch=200,
                   epochs=int(sys.argv[2]))
 
-_, seed = next(frame_data_generator(batch_size=5,
+seed = next(frame_data_generator(batch_size=5,
                                     sample_size=sample_size,
                                     batch_start=random.randint(0,
-                                    len(frame_names) - 20)))
+                                    len(frame_names) - 20)))[0][:1,:,:,:,:]
 # for _ in range(random.randint(0, len(frame_names) - 10)):
 #     _, seed = next(frame_data_generator(batch_size=10, sample_size=7))
 
 
-for f in range(12):
-    cv2.imwrite("generated/gen_%s__%d___res_%s___epochs_%s___ss_%s.jpg" % (datetime.datetime.now(), f, sys.argv[1], sys.argv[2], sys.argv[3]), (seed[0, 0, :, :, :] * 255))
-    seed = seq.predict(seed)
+for f in range(10):
+    filename = "generated/%s_ _frame_%d_ _res_%s_ _epochs_%s_ _ss_%s.jpg" % (datetime.now().strftime('%Y.%m.%d %H.%M'), f, sys.argv[1], sys.argv[2], sys.argv[3])
+    cv2.imwrite(filename, (seed[0, 0, :, :, :] * 255))
+    new_frame = seq.predict(seed)
+    seed = np.concatenate((seed[:, 1:, :, :, :],
+                           new_frame[np.newaxis, :]),
+                          axis=1)
+    # print ("old seed chopped shape", seed[:1, 1:, :, :, :].shape)
+    # print ("new prediction shape", seq.predict(seed[:1, 1:, :, :, :]).shape)
