@@ -12,6 +12,8 @@ RES = int(sys.argv[1])
 
 # goes through each vid in vids
 for vid in os.listdir('vids')[1:]:
+    if vid[-4:] != '.mp4':
+        continue
     # load video
     vidcap = cv2.VideoCapture('vids/' + vid)
     # load first frame

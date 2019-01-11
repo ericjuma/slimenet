@@ -79,7 +79,7 @@ def frame_data_generator(batch_size, sample_size, batch_start=0):
                 )
             y = np.stack(y)
             #   print("y shape", y.shape)
-            #assert(np.array_equal(x[1],y[0]))
+            assert(np.array_equal(x[1, -1],y[0]))
 
             yield (x, y)
 
