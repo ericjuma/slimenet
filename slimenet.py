@@ -10,15 +10,23 @@ from datetime import datetime
 import sys
 import random
 
+
 # Heighth and width of frames
 RES = int(sys.argv[1])
-sample_size = int(sys.argv[3])
-batch_size = 3
-frame_names = [f for f in os.listdir('frames') if f[:3] == 'vid']
-total_num_frames = len(frame_names)
-# We create a layer which take as input movies of shape
-# (n_frames, width, height, channels) and returns a movie
-# of identical shape.
+# Num of epochs
+EPOCHS = int(sys.argv[2])
+# Sample size - number of frames given to the network at a time
+SS = int(sys.argv[3])
+# Number of frames to generate
+GEN = int(sys.argv[4])
+# Number of serie of frames given to the network at a time
+BATCH_SIZE = 3
+# Paths of frame images relative to vids/
+FRAME_NAMES = [f for f in os.listdir('frames') if f[:3] == 'vid']
+TOTAL_NUM_FRAMES = len(FRAME_NAMES)
+
+# Network takes in videos of shape (n_frames, width, height, channels)
+# and returns a prediction of the next frame in each video
 
 seq = Sequential()
 seq.add(ConvLSTM2D(filters=RES, kernel_size=(3, 3),
@@ -44,57 +52,62 @@ seq.add(Conv2D(filters=1, kernel_size=(3, 3),
 
 seq.compile(loss='binary_crossentropy', optimizer='adadelta')
 
-seed = None
-seed_num = random.randint(0, len(frame_names) - 10)
 
-def frame_data_generator(batch_size, sample_size, start_on_frame=0):
+def frame_data_generator(start_on_frame=0):
 
     is_beginning_of_new_epoch = True
     while True:
         if is_beginning_of_new_epoch:
-            batch_start = start_on_frame + sample_size + 1
-            batch_end = batch_size + batch_start
+            batch_start = start_on_frame + SS + 1
+            batch_end = BATCH_SIZE + batch_start
 
         # each time through this loop a batch is yielded until end of data
-        limit = min(batch_end, total_num_frames)
+        limit = min(batch_end, TOTAL_NUM_FRAMES)
         this_batch_size = limit - batch_start
         relevant_frames = []
-        for frame in frame_names[batch_start - (sample_size + 1):limit]:
-            relevant_frames.append(cv2.imread('frames/' + frame)[:, :, :1] / 255.0)
-        #relevant_frames = [f for f in relevant_frames if f.shape == (RES, RES, 1)]
-        x = np.ndarray((0, sample_size, RES, RES, 1))
+        for frame in FRAME_NAMES[batch_start - (SS + 1):limit]:
+            relevant_frames.append(
+                cv2.imread('frames/' + frame)[:, :, :1] / 255.0
+            )
+
+        x = np.ndarray((0, SS, RES, RES, 1))
         y = np.ndarray((0, RES, RES, 1))
 
         for i in range(this_batch_size):
-            x = np.concatenate((x, np.stack(relevant_frames[i:i + sample_size])[np.newaxis, :]))
-            y = np.concatenate((y, relevant_frames[i + sample_size][np.newaxis, :]))
+            x = np.concatenate((
+                x,
+                np.stack(relevant_frames[i:i + SS])[np.newaxis, :]
+            ))
+            y = np.concatenate((
+                y,
+                relevant_frames[i + SS][np.newaxis, :]
+            ))
 
-        assert(np.array_equal(x[1, -1],y[0]))
+        assert(np.array_equal(x[1, -1], y[0]))
         yield (x, y)
 
-        batch_start += batch_size
-        batch_end += batch_size
-        is_beginning_of_new_epoch = batch_start >= total_num_frames
+        batch_start += BATCH_SIZE
+        batch_end += BATCH_SIZE
+        is_beginning_of_new_epoch = batch_start >= TOTAL_NUM_FRAMES
 
 
 # Train the network
-seq.fit_generator(frame_data_generator(batch_size=batch_size, sample_size=sample_size),
-                  steps_per_epoch=int(total_num_frames / batch_size),
-                  epochs=int(sys.argv[2]))
+seq.fit_generator(
+        frame_data_generator(),
+        steps_per_epoch=int(TOTAL_NUM_FRAMES / BATCH_SIZE),
+        epochs=EPOCHS
+)
 
-seed = next(frame_data_generator(batch_size=batch_size,
-                                    sample_size=sample_size,
-                                    start_on_frame=random.randint(0,
-                                    len(frame_names) - 20)))[0][:1,:,:,:,:]
-# seed = next(frame_data_generator(batch_size=batch_size,
-#                                     sample_size=sample_size,
-#                                     start_on_frame=2613)
-for f in range(10):
-    filename = "generated/%s_ _frame_%d_ _res_%s_ _epochs_%s_ _ss_%s.jpg" % (datetime.now().strftime('%Y.%m.%d %H.%M'), f, sys.argv[1], sys.argv[2], sys.argv[3])
-    cv2.imwrite(filename, (seed[0, 0, :, :, :] * 255))
+# Generate and save new frames
+
+seed = next(frame_data_generator(
+    start_on_frame=random.randint(0, TOTAL_NUM_FRAMES - 20)))[0][:1, :]
+
+for f in range(GEN):
+    filename = "generated/%s_frame%d_res%s_epochs%s_ss%s.jpg" % \
+        (datetime.now().strftime('%Y.%m.%d %H.%M'), f, RES, EPOCHS, SS)
+    cv2.imwrite(filename, (seed[0, -1, :, :, :] * 255))
     new_frame = seq.predict(seed)
     seed = np.concatenate((seed[:, 1:, :, :, :],
                            new_frame[np.newaxis, :]),
                           axis=1)
-    # print ("old seed chopped shape", seed[:1, 1:, :, :, :].shape)
-    # print ("new prediction shape", seq.predict(seed[:1, 1:, :, :, :]).shape)

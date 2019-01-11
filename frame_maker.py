@@ -29,7 +29,7 @@ for vid in os.listdir('vids')[1:]:
     # goes thru each frame in the vid, scales and saves it
     count = 0
     while success:
-        # proportionally scale image so that one dimension is desired resolution
+        # proportionally scale image so one dimension is desired resolution
         # and the other dimension is larger or equal to that resolution
         image = cv2.resize(image, (new_frame_width, new_frame_height))
         # compute the amount to crop off from each side and crop it
